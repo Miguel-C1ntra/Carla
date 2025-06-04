@@ -1,0 +1,174 @@
+import carla
+import time
+import threading
+import random
+import sys
+
+# === CONFIGURAÇÃO ===
+VEICULO_1_BP = 'vehicle.audi.tt'
+VEICULO_2_BP = 'vehicle.audi.tt'
+PEDESTRE_BP = 'walker.pedestrian.0001'
+NUM_PEDESTRES = 18
+DISTANCIA_ENTRE_FAIXAS = 4.0
+LARGURA_CALCADA = 2.5
+DISTANCIA_CORRIDA = 130.0
+TEMPO_CORRIDA = 6  # Tempo que os carros avançam antes de parar
+
+# === CONEXÃO COM CARLA ===
+client = carla.Client('localhost', 2000)
+client.set_timeout(10.0)
+world = client.get_world()
+bp_lib = world.get_blueprint_library()
+
+# === BLUEPRINTS ===
+bp_1 = bp_lib.find(VEICULO_1_BP)
+bp_2 = bp_lib.find(VEICULO_2_BP)
+ped_bp = bp_lib.find(PEDESTRE_BP)
+
+# === CLIMAS DISPONÍVEIS ===
+from carla import WeatherParameters
+climas = [
+    WeatherParameters.ClearNoon,
+    WeatherParameters.CloudySunset,
+    WeatherParameters.WetCloudySunset,
+    WeatherParameters.MidRainyNoon,
+    WeatherParameters.WetNoon,
+    WeatherParameters.HardRainNoon,
+    WeatherParameters.SoftRainSunset
+]
+clima_atual_idx = 0
+
+# === DEFINIR POSIÇÃO BASE PARA LARGADA ===
+spawn_points = world.get_map().get_spawn_points()
+base = spawn_points[1]
+base_loc = base.location
+base_rot = base.rotation
+
+# === TRANSFORM DOS DOIS CARROS (LADO A LADO) ===
+spawn_carro_1 = carla.Transform(
+    carla.Location(x=base_loc.x, y=base_loc.y - DISTANCIA_ENTRE_FAIXAS / 2, z=base_loc.z),
+    base_rot
+)
+spawn_carro_2 = carla.Transform(
+    carla.Location(x=base_loc.x, y=base_loc.y + DISTANCIA_ENTRE_FAIXAS / 2, z=base_loc.z),
+    base_rot
+)
+
+# === SPAWN DOS VEÍCULOS ===
+carro1 = world.try_spawn_actor(bp_1, spawn_carro_1)
+carro2 = world.try_spawn_actor(bp_2, spawn_carro_2)
+
+if not carro1 or not carro2:
+    print("❌ Erro ao spawnar os veículos.")
+    sys.exit(1)
+
+# === SPAWN DE PEDESTRES COMO PLATEIA NAS CALÇADAS ===
+pedestres = []
+espacamento = DISTANCIA_CORRIDA / NUM_PEDESTRES
+
+for i in range(NUM_PEDESTRES):
+    x = base_loc.x + i * espacamento
+
+    # Lado esquerdo
+    y_esq = base_loc.y - DISTANCIA_ENTRE_FAIXAS / 2 - LARGURA_CALCADA
+    ped1 = world.try_spawn_actor(ped_bp, carla.Transform(carla.Location(x=x, y=y_esq, z=1.0), base_rot))
+    if ped1:
+        ped1.set_simulate_physics(True)
+        pedestres.append(ped1)
+
+    # Lado direito
+    y_dir = base_loc.y + DISTANCIA_ENTRE_FAIXAS / 2 + LARGURA_CALCADA
+    ped2 = world.try_spawn_actor(ped_bp, carla.Transform(carla.Location(x=x, y=y_dir, z=1.0), base_rot))
+    if ped2:
+        ped2.set_simulate_physics(True)
+        pedestres.append(ped2)
+
+# === FUNÇÃO DE RESET DOS CARROS ===
+def resetar_carros():
+    carro1.apply_control(carla.VehicleControl(throttle=0.0, brake=1.0))
+    carro2.apply_control(carla.VehicleControl(throttle=0.0, brake=1.0))
+    time.sleep(1)
+
+    carro1.set_transform(spawn_carro_1)
+    carro2.set_transform(spawn_carro_2)
+
+    carro1.apply_control(carla.VehicleControl(throttle=0.0, brake=1.0))
+    carro2.apply_control(carla.VehicleControl(throttle=0.0, brake=1.0))
+
+# === FUNÇÃO DE EXPLOSÃO ===
+def explodir(actor):
+    try:
+        loc = actor.get_location()
+        world.debug.draw_string(loc, "💥", life_time=3.0, color=carla.Color(r=255, g=0, b=0))
+        actor.destroy()
+    except:
+        pass
+
+# === FUNÇÃO DE CORRIDA E CONTROLE DE CLIMA ===
+def corrida_loop():
+    global clima_atual_idx
+
+    while True:
+        print("\n⌨️ Digite '1' para iniciar a corrida ou 'c' para mudar o clima.")
+        entrada = input().strip().lower()
+
+        if entrada == "1":
+            print("🏁 Corrida iniciada!")
+
+            carro1.apply_control(carla.VehicleControl(throttle=1.0, brake=0.0))
+            carro2.apply_control(carla.VehicleControl(throttle=1.0, brake=0.0))
+            inicio = time.time()
+
+            while time.time() - inicio < TEMPO_CORRIDA:
+                tempo = time.time() - inicio
+                print(f"⏱️ Tempo: {tempo:.1f}s", end="\r")
+                time.sleep(0.1)
+
+            carro1.apply_control(carla.VehicleControl(throttle=0.0, brake=1.0))
+            carro2.apply_control(carla.VehicleControl(throttle=0.0, brake=1.0))
+            print("\n🛑 Corrida encerrada. Resetando carros...")
+            time.sleep(1)
+            resetar_carros()
+            print("🔁 Pronto para nova corrida.")
+
+        elif entrada == "c":
+            clima_atual_idx = (clima_atual_idx + 1) % len(climas)
+            novo_clima = climas[clima_atual_idx]
+            world.set_weather(novo_clima)
+            print(f"🌦️ Clima alterado para: {novo_clima}")
+
+        else:
+            print("❌ Entrada inválida. Use '1' para corrida ou 'c' para clima.")
+
+# === INICIAR THREAD DE CONTROLE ===
+threading.Thread(target=corrida_loop, daemon=True).start()
+
+# === LOOP PRINCIPAL ===
+print("💡 Pressione Ctrl+C para encerrar com explosões.")
+try:
+    while True:
+        time.sleep(0.1)
+
+except KeyboardInterrupt:
+    print("\n💥 Encerrando simulação com explosões...")
+    explodir(carro1)
+    explodir(carro2)
+    for ped in pedestres:
+        explodir(ped)
+    print("✅ Tudo destruído. Simulação encerrada.")
+    sys.exit(0)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
