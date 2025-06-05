@@ -1,0 +1,83 @@
+import carla
+import time
+
+def spawn_vehicle(world, blueprint_library, vehicle_name, transform):
+    vehicle_bp = blueprint_library.find(vehicle_name)
+    if vehicle_bp is None:
+        print(f"Blueprint do veículo '{vehicle_name}' não encontrado.")
+        return None
+    vehicle = world.try_spawn_actor(vehicle_bp, transform)
+    if vehicle is not None:
+        print(f"Veículo '{vehicle_name}' spawnado em spawn point {transform.location}")
+    else:
+        print(f"Falha ao spawnar veículo '{vehicle_name}' em spawn point {transform.location}")
+    return vehicle
+
+def destroy_actor(actor):
+    if actor is not None:
+        try:
+            if actor.is_alive:
+                actor.destroy()
+                print(f"Veículo destruído.")
+        except Exception as e:
+            print(f"Erro ao destruir veículo: {e}")
+
+def main():
+    client = carla.Client('localhost', 2000)
+    client.set_timeout(10.0)
+    world = client.get_world()
+    blueprint_library = world.get_blueprint_library()
+    
+    # --- Alterar aqui para o veículo desejado ---
+    vehicle_name = 'vehicle.tesla.model3'  # <-- Mude aqui para o veículo que quiser spawnar
+    
+    spawn_points = world.get_map().get_spawn_points()
+
+    if not spawn_points:
+        print("Nenhum ponto de spawn disponível no mapa.")
+        return
+    
+    max_spawn_index = min(len(spawn_points), 155)  # Limita até 155 pontos, se existirem
+    
+    current_spawn_index = 1  # Começa no primeiro ponto (índice 0)
+
+    vehicle = spawn_vehicle(world, blueprint_library, vehicle_name, spawn_points[current_spawn_index])
+    if vehicle is None:
+        print("Não foi possível spawnar o veículo no spawn inicial. Encerrando.")
+        return
+    
+    print(f"Veículo spawnado no spawn point {current_spawn_index + 1} (índice interno {current_spawn_index}).")
+    print("Digite 'c' para trocar para o próximo spawn point, ou 'q' para sair.")
+
+    while True:
+        comando = input(">>> ").strip().lower()
+        if comando == 'c':
+            destroy_actor(vehicle)
+            vehicle = None
+            
+            # Próximo spawn point em loop (de 0 até max_spawn_index-1)
+            current_spawn_index = (current_spawn_index + 1) % max_spawn_index
+            
+            # Tenta spawnar no novo spawn point até conseguir (com timeout)
+            timeout = 10.0
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                vehicle = spawn_vehicle(world, blueprint_library, vehicle_name, spawn_points[current_spawn_index])
+                if vehicle is not None:
+                    print(f"Veículo spawnado no spawn point {current_spawn_index + 1} (índice interno {current_spawn_index}).")
+                    break
+                time.sleep(0.3)
+            
+            if vehicle is None:
+                print("Falha ao spawnar no próximo spawn point. Encerrando.")
+                break
+
+        elif comando == 'q':
+            print("Encerrando script e destruindo veículo.")
+            destroy_actor(vehicle)
+            break
+        else:
+            print("Comando inválido. Digite 'c' para trocar ou 'q' para sair.")
+
+if __name__ == '__main__':
+    main()

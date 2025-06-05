@@ -1,0 +1,36 @@
+import carla
+import random
+
+# Conectar ao servidor CARLA
+client = carla.Client('localhost', 2000)
+client.set_timeout(10.0)
+
+# Obter o mundo
+world = client.get_world()
+
+# Lista de climas disponíveis
+weather_presets = [
+    carla.WeatherParameters.ClearNoon,
+    carla.WeatherParameters.CloudySunset,
+    carla.WeatherParameters.WetSunset,
+    carla.WeatherParameters.WetCloudyNoon,
+    carla.WeatherParameters.MidRainyNoon,
+    carla.WeatherParameters.HardRainNoon,
+    carla.WeatherParameters.SoftRainSunset,
+    carla.WeatherParameters.ClearSunset
+]
+
+print("Digite 'c' para mudar o clima ou 'q' para sair.")
+
+while True:
+    comando = input(">>> ").strip().lower()
+
+    if comando == 'c':
+        novo_clima = random.choice(weather_presets)
+        world.set_weather(novo_clima)
+        print(f"✅ Clima alterado para: {novo_clima}")
+    elif comando == 'q':
+        print("Encerrando o script.")
+        break
+    else:
+        print("Comando inválido. Use 'c' para mudar o clima ou 'q' para sair.")
