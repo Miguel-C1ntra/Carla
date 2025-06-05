@@ -1,5 +1,5 @@
-### Carla
-No primeiro exemplo, mostramos como spawnar veículos nos pontos pré-definidos do mapa.
+# Carla
+ No primeiro exemplo, mostramos como spawnar veículos nos pontos pré-definidos do mapa.
 
 Você pode escolher o modelo do veículo (por exemplo, vehicle.tesla.model3).
 
@@ -35,6 +35,10 @@ O que você aprende:
 
 Usar carla.WeatherParameters
 
+<a href="https://postimg.cc/hX01fHNq">
+  <img src="https://i.postimg.cc/52h7kJ3j/Chat-GPT-Image-May-6-2025-04-40-36-PM.png" alt="imagem de teste" width="200">
+</a>
+
 Aplicar mudanças como:
 
 ClearNoon
@@ -50,7 +54,11 @@ CARLA suporta vários mapas, como Town01, Town02, até Town10HD. Você pode carr
 
 O que você aprende:
 
-Usar client.load_world("Town03")
+Usar:
+
+~~~python
+client.load_world("Town03")
+~~~
 
 Reiniciar o ambiente em uma cidade diferente
 
