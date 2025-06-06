@@ -33,9 +33,9 @@ O CARLA permite simular diferentes condições climáticas, como chuva, neblina,
 
 O que você aprende:
 
-- Usar carla.WeatherParameters
+ Usar carla.WeatherParameters
 
-- Aplicar mudanças como:
+Aplicar mudanças como:
 
 - ClearNoon
 
